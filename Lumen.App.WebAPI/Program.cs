@@ -16,8 +16,18 @@ public class Program {
 
         var builder = WebApplication.CreateBuilder(args);
 
+        // Config
+        builder.Configuration
+            .SetBasePath(Directory.GetCurrentDirectory())
+            .AddUserSecrets<Program>(true)
+            .AddEnvironmentVariables()
+            .AddJsonFile("appsettings.json", false)
+            .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", true)
+            .Build();
+
         // Add services to the container.
-        var modulesAssemblies = builder.Services.LoadModules([], "CONNECTIONSTRING"); // TODO: Config
+        var connectionString = builder.Configuration.GetConnectionString("Lumen") ?? throw new NullReferenceException("The connection string is not defined !");
+        var modulesAssemblies = builder.Services.LoadModules([], connectionString); // TODO: Config
 
         var mvcBuilder = builder.Services.AddControllers();
         foreach (var module in modulesAssemblies) {
