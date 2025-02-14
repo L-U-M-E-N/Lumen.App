@@ -1,4 +1,5 @@
 using Lumen.App.ModuleLoader;
+using Lumen.App.WebAPI.HostedServices;
 using Lumen.Modules.Sdk;
 
 using Microsoft.EntityFrameworkCore;
@@ -26,6 +27,8 @@ public class Program {
         mvcBuilder.AddControllersAsServices();
 
         builder.Services.AddOpenApi();
+
+        builder.Services.AddHostedService<ModuleExecutionHostedService>();
 
         var app = builder.Build();
 
