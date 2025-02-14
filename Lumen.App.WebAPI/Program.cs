@@ -16,7 +16,7 @@ public class Program {
         var builder = WebApplication.CreateBuilder(args);
 
         // Add services to the container.
-        var modulesAssemblies = builder.Services.LoadModules("CONNECTIONSTRING"); // TODO: Config
+        var modulesAssemblies = builder.Services.LoadModules([], "CONNECTIONSTRING"); // TODO: Config
 
         var mvcBuilder = builder.Services.AddControllers();
         foreach (var module in modulesAssemblies) {

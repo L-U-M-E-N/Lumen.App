@@ -9,7 +9,7 @@ namespace Lumen.App.ModuleLoader {
     public static class ModuleLoaderHelper {
         public static LumenModuleRunsOnFlag RunsOn { get; set; }
 
-        public static IEnumerable<Assembly> LoadModules(this IServiceCollection services, string connectionString) {
+        public static IEnumerable<Assembly> LoadModules(this IServiceCollection services, IEnumerable<ConfigEntry> configEntries, string connectionString) {
             var DLLlist = Directory.GetFiles(AppDomain.CurrentDomain.BaseDirectory)
                 .Where(x => x.EndsWith(".dll"));
             var modulesAssemblies = new List<Assembly>();
@@ -24,7 +24,8 @@ namespace Lumen.App.ModuleLoader {
                             module,
                             [
                                 RunsOn,
-                                    x.GetRequiredService<ILogger<LumenModuleBase>>()
+                                configEntries.Where(x => x.ModuleName == module.Name),
+                                x.GetRequiredService<ILogger<LumenModuleBase>>()
                             ]
                         );
 
