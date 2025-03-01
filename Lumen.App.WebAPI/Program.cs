@@ -27,7 +27,7 @@ public class Program {
 
         // Add services to the container.
         var connectionString = builder.Configuration.GetConnectionString("Lumen") ?? throw new NullReferenceException("The connection string is not defined !");
-        var modulesAssemblies = builder.Services.LoadModules([], connectionString); // TODO: Config
+        var modulesAssemblies = builder.Services.LoadModules(GetConfigurationEntries(builder.Configuration), connectionString); // TODO: Config
 
         var mvcBuilder = builder.Services.AddControllers();
         foreach (var module in modulesAssemblies) {
@@ -72,5 +72,21 @@ public class Program {
         app.MapControllers();
 
         app.Run();
+    }
+
+    private static IEnumerable<ConfigEntry> GetConfigurationEntries(ConfigurationManager configuration) {
+        var moduleSection = configuration.GetSection("Modules");
+        var entries = new List<ConfigEntry>();
+        foreach (var module in moduleSection.GetChildren()) {
+            foreach (var configEntry in module.GetChildren()) {
+                entries.Add(new ConfigEntry {
+                    ConfigKey = configEntry.Key,
+                    ConfigValue = configEntry.Value,
+                    ModuleName = module.Key,
+                });
+            }
+        }
+
+        return entries;
     }
 }
