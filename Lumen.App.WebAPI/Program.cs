@@ -26,8 +26,8 @@ public class Program {
             .Build();
 
         // Add services to the container.
-        var connectionString = builder.Configuration.GetConnectionString("Lumen") ?? throw new NullReferenceException("The connection string is not defined !");
-        var modulesAssemblies = builder.Services.LoadModules(GetConfigurationEntries(builder.Configuration), connectionString); // TODO: Config
+        var connectionString = GetConnectionString();
+        var modulesAssemblies = builder.Services.LoadModules(GetConfigurationEntries(builder.Configuration), connectionString);
 
         var mvcBuilder = builder.Services.AddControllers();
         foreach (var module in modulesAssemblies) {
@@ -88,5 +88,14 @@ public class Program {
         }
 
         return entries;
+    }
+
+    private static string GetConnectionString() {
+        var host = Environment.GetEnvironmentVariable("PG_HOST");
+        var username = Environment.GetEnvironmentVariable("PG_USER");
+        var password = Environment.GetEnvironmentVariable("PG_PASSWORD");
+        var database = Environment.GetEnvironmentVariable("PG_DB");
+
+        return $"Host={host};Database={database};Username={username};Password={password}";
     }
 }
