@@ -31,7 +31,7 @@ namespace Lumen.App.WebAPI.HostedServices {
             }
 
             await Task.Run(() => {
-                modulesRunTimer = new System.Timers.Timer(1_000_000);
+                modulesRunTimer = new System.Timers.Timer(1_000);
                 modulesRunTimer.Elapsed += RunModulesTasksFromTimer;
                 modulesRunTimer.AutoReset = true;
                 modulesRunTimer.Enabled = true;
