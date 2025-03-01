@@ -10,39 +10,43 @@ namespace Lumen.App.ModuleLoader {
         public static LumenModuleRunsOnFlag RunsOn { get; set; }
 
         public static IEnumerable<Assembly> LoadModules(this IServiceCollection services, IEnumerable<ConfigEntry> configEntries, string connectionString) {
-            var DLLlist = Directory.GetFiles(AppDomain.CurrentDomain.BaseDirectory)
-                .Where(x => x.EndsWith(".dll"));
+            var modulesDirectories = Directory.GetDirectories("modules");
             var modulesAssemblies = new List<Assembly>();
 
-            foreach (var file in DLLlist) {
-                var currentAssembly = Assembly.LoadFrom(file);
-                IEnumerable<Type> modules = currentAssembly.ExportedTypes.Where(x => x.IsSubclassOf(typeof(LumenModuleBase)));
+            foreach (var directory in modulesDirectories) {
+                var DLLlist = Directory.GetFiles(directory)
+                    .Where(x => x.EndsWith(".dll"));
 
-                foreach (var module in modules) {
-                    services.AddScoped<LumenModuleBase>(x => {
-                        var instance = Activator.CreateInstance(
-                            module,
-                            [
-                                RunsOn,
-                                configEntries.Where(x => x.ModuleName == module.Name),
-                                x.GetRequiredService<ILogger<LumenModuleBase>>()
-                            ]
-                        );
+                foreach (var file in DLLlist) {
+                    var currentAssembly = Assembly.LoadFrom(file);
+                    IEnumerable<Type> modules = currentAssembly.ExportedTypes.Where(x => x.IsSubclassOf(typeof(LumenModuleBase)));
 
-                        if (instance is null) {
-                            throw new ArgumentNullException($"Cannot instanciate the current module: {module.Name}");
-                        }
+                    foreach (var module in modules) {
+                        services.AddScoped<LumenModuleBase>(x => {
+                            var instance = Activator.CreateInstance(
+                                module,
+                                [
+                                    configEntries.Where(x => x.ModuleName == module.Name),
+                                    x.GetRequiredService<ILogger<LumenModuleBase>>(),
+                                    x.GetRequiredService<IServiceProvider>()
+                                ]
+                            );
 
-                        var typedInstance = (LumenModuleBase)instance;
+                            if (instance is null) {
+                                throw new ArgumentNullException($"Cannot instanciate the current module: {module.Name}");
+                            }
 
-                        return typedInstance;
-                    });
+                            var typedInstance = (LumenModuleBase)instance;
 
-                    module.GetMethod(nameof(LumenModuleBase.SetupServices), BindingFlags.Static | BindingFlags.Public)?.Invoke(null, new object[] { RunsOn, services, connectionString });
-                }
+                            return typedInstance;
+                        });
 
-                if (modules.Any()) {
-                    modulesAssemblies.Add(currentAssembly);
+                        module.GetMethod(nameof(LumenModuleBase.SetupServices), BindingFlags.Static | BindingFlags.Public)?.Invoke(null, new object[] { RunsOn, services, connectionString });
+                    }
+
+                    if (modules.Any()) {
+                        modulesAssemblies.Add(currentAssembly);
+                    }
                 }
             }
 
