@@ -1,5 +1,6 @@
 using Lumen.App.ModuleLoader;
 using Lumen.App.WebAPI.HostedServices;
+using Lumen.App.WebAPI.Middlewares;
 using Lumen.Modules.Sdk;
 
 using Microsoft.EntityFrameworkCore;
@@ -65,6 +66,7 @@ public class Program {
             });
         }
 
+        app.UseMiddleware<ApiKeyMiddleware>();
         app.UseHttpsRedirection();
 
         app.UseAuthorization();
