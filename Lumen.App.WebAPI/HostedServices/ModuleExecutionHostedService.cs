@@ -1,4 +1,4 @@
-
+﻿
 using Lumen.Modules.Sdk;
 
 using System.Timers;
@@ -6,7 +6,7 @@ using System.Timers;
 namespace Lumen.App.WebAPI.HostedServices {
     public class ModuleExecutionHostedService(IServiceProvider serviceProvider, ILogger<ModuleExecutionHostedService> logger) : IHostedService {
         public const LumenModuleRunsOnFlag RunsOn = LumenModuleRunsOnFlag.API;
-        private System.Timers.Timer modulesRunTimer = null!;
+        private System.Timers.Timer modulesRunTimer;
 
         private async Task RunModulesTasks() {
             using var scope = serviceProvider.CreateScope();
@@ -40,8 +40,10 @@ namespace Lumen.App.WebAPI.HostedServices {
             }, cancellationToken);
         }
 
-        public async Task StopAsync(CancellationToken cancellationToken) {
-            // Do nothing
+        public Task StopAsync(CancellationToken cancellationToken) {
+            modulesRunTimer.Stop();
+
+            return Task.CompletedTask;
         }
     }
 }
