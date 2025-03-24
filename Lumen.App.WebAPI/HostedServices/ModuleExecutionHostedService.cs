@@ -1,4 +1,4 @@
-﻿
+
 using Lumen.Modules.Sdk;
 
 using System.Timers;
@@ -10,10 +10,12 @@ namespace Lumen.App.WebAPI.HostedServices {
 
         private async Task RunModulesTasks() {
             using var scope = serviceProvider.CreateScope();
+            var now = DateTime.UtcNow;
+
             var modules = scope.ServiceProvider.GetServices<LumenModuleBase>();
             foreach (var module in modules) {
-                if (module.ShouldRunNow(RunsOn)) {
-                    await module.RunAsync(RunsOn);
+                if (module.ShouldRunNow(RunsOn, now)) {
+                    await module.RunAsync(RunsOn, now);
                 }
             }
         }
