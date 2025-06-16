@@ -8,6 +8,7 @@ using Microsoft.EntityFrameworkCore;
 using OpenTelemetry;
 using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
+using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 
 using Swashbuckle.AspNetCore.SwaggerUI;
@@ -32,24 +33,26 @@ public class Program {
             .Build();
 
         var openTelemetryBuilder = builder.Services.AddOpenTelemetry()
-        .WithTracing(otBuilder => {
+            .WithTracing(otBuilder => {
 
-            otBuilder.AddAspNetCoreInstrumentation()
-            .AddHttpClientInstrumentation()
-            .AddSqlClientInstrumentation();
-            if (builder.Environment.EnvironmentName == "Development") {
-                otBuilder.AddConsoleExporter();
-            }
-        })
-        .WithMetrics(otBuilder => {
-            otBuilder.AddAspNetCoreInstrumentation()
-            .AddHttpClientInstrumentation()
-            .AddSqlClientInstrumentation();
-            otBuilder.AddConsoleExporter();
-        })
-        .WithLogging(otBuilder => {
-            otBuilder.AddConsoleExporter();
-        });
+                otBuilder.AddAspNetCoreInstrumentation()
+                .AddHttpClientInstrumentation()
+                .AddSqlClientInstrumentation()
+                .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService(builder.Environment.ApplicationName));
+            })
+            .WithMetrics(otBuilder => {
+                otBuilder.AddAspNetCoreInstrumentation()
+                .AddHttpClientInstrumentation()
+                .AddSqlClientInstrumentation()
+                .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService(builder.Environment.ApplicationName));
+            })
+            .WithLogging(otBuilder => {
+                otBuilder.SetResourceBuilder(ResourceBuilder.CreateDefault().AddService(builder.Environment.ApplicationName));
+
+                if (builder.Environment.EnvironmentName == "Development") {
+                    otBuilder.AddConsoleExporter();
+                }
+            });
 
         if (builder.Environment.EnvironmentName != "Development") {
             openTelemetryBuilder.UseOtlpExporter();
