@@ -5,6 +5,10 @@ using Lumen.Modules.Sdk;
 
 using Microsoft.EntityFrameworkCore;
 
+using OpenTelemetry;
+using OpenTelemetry.Metrics;
+using OpenTelemetry.Trace;
+
 using Swashbuckle.AspNetCore.SwaggerUI;
 
 namespace Lumen.App.WebAPI;
@@ -25,6 +29,29 @@ public class Program {
             .AddJsonFile("appsettings.json", false)
             .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", true)
             .Build();
+
+        var openTelemetryBuilder = builder.Services.AddOpenTelemetry()
+        .WithTracing(otBuilder => {
+
+            otBuilder.AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddSqlClientInstrumentation();
+            if (builder.Environment.EnvironmentName == "Development") {
+                otBuilder.AddConsoleExporter();
+            }
+        })
+        .WithMetrics(otBuilder => {
+            otBuilder.AddAspNetCoreInstrumentation()
+            .AddHttpClientInstrumentation()
+            .AddSqlClientInstrumentation();
+        })
+        .WithLogging(otBuilder => {
+
+        });
+
+        if (builder.Environment.EnvironmentName != "Development") {
+            openTelemetryBuilder.UseOtlpExporter();
+        }
 
         // Add services to the container.
         var connectionString = GetConnectionString();
