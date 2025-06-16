@@ -6,6 +6,7 @@ using Lumen.Modules.Sdk;
 using Microsoft.EntityFrameworkCore;
 
 using OpenTelemetry;
+using OpenTelemetry.Logs;
 using OpenTelemetry.Metrics;
 using OpenTelemetry.Trace;
 
@@ -44,9 +45,10 @@ public class Program {
             otBuilder.AddAspNetCoreInstrumentation()
             .AddHttpClientInstrumentation()
             .AddSqlClientInstrumentation();
+            otBuilder.AddConsoleExporter();
         })
         .WithLogging(otBuilder => {
-
+            otBuilder.AddConsoleExporter();
         });
 
         if (builder.Environment.EnvironmentName != "Development") {
