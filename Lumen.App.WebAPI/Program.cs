@@ -1,3 +1,4 @@
+using Dysnomia.Common.OpenTelemetry;
 using Lumen.App.ModuleLoader;
 using Lumen.App.WebAPI.HostedServices;
 using Lumen.App.WebAPI.Middlewares;
@@ -16,120 +17,97 @@ using Swashbuckle.AspNetCore.SwaggerUI;
 namespace Lumen.App.WebAPI;
 
 public class Program {
-    protected Program() { }
+	protected Program() { }
 
-    public static async Task Main(string[] args) {
-        ModuleLoaderHelper.RunsOn = Lumen.Modules.Sdk.LumenModuleRunsOnFlag.API;
+	public static async Task Main(string[] args) {
+		ModuleLoaderHelper.RunsOn = Lumen.Modules.Sdk.LumenModuleRunsOnFlag.API;
 
-        var builder = WebApplication.CreateBuilder(args);
+		var builder = WebApplication.CreateBuilder(args);
 
-        // Config
-        builder.Configuration
-            .SetBasePath(Directory.GetCurrentDirectory())
-            .AddUserSecrets<Program>(true)
-            .AddEnvironmentVariables()
-            .AddJsonFile("appsettings.json", false)
-            .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", true)
-            .Build();
+		// Config
+		builder.Configuration
+			.SetBasePath(Directory.GetCurrentDirectory())
+			.AddUserSecrets<Program>(true)
+			.AddEnvironmentVariables()
+			.AddJsonFile("appsettings.json", false)
+			.AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", true)
+			.Build();
 
-        var openTelemetryBuilder = builder.Services.AddOpenTelemetry()
-            .WithTracing(otBuilder => {
+		builder.Services.EnableOpenTelemetry(builder.Environment);
 
-                otBuilder.AddAspNetCoreInstrumentation()
-                .AddHttpClientInstrumentation()
-                .AddSqlClientInstrumentation()
-                .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService(builder.Environment.ApplicationName));
-            })
-            .WithMetrics(otBuilder => {
-                otBuilder.AddAspNetCoreInstrumentation()
-                .AddHttpClientInstrumentation()
-                .AddSqlClientInstrumentation()
-                .SetResourceBuilder(ResourceBuilder.CreateDefault().AddService(builder.Environment.ApplicationName));
-            })
-            .WithLogging(otBuilder => {
-                otBuilder.SetResourceBuilder(ResourceBuilder.CreateDefault().AddService(builder.Environment.ApplicationName));
+		// Add services to the container.
+		//var connectionString = GetConnectionString();
+		var connectionString = builder.Configuration.GetConnectionString("Lumen");
+		var modulesAssemblies = builder.Services.LoadModules(GetConfigurationEntries(builder.Configuration), connectionString);
 
-                if (builder.Environment.EnvironmentName == "Development") {
-                    otBuilder.AddConsoleExporter();
-                }
-            });
+		var mvcBuilder = builder.Services.AddControllers();
+		foreach (var module in modulesAssemblies) {
+			// Web controllers
+			mvcBuilder.AddApplicationPart(module);
+		}
+		mvcBuilder.AddControllersAsServices();
 
-        if (builder.Environment.EnvironmentName != "Development") {
-            openTelemetryBuilder.UseOtlpExporter();
-        }
+		builder.Services.AddOpenApi();
 
-        // Add services to the container.
-        var connectionString = GetConnectionString();
-        var modulesAssemblies = builder.Services.LoadModules(GetConfigurationEntries(builder.Configuration), connectionString);
+		builder.Services.AddHostedService<ModuleExecutionHostedService>();
 
-        var mvcBuilder = builder.Services.AddControllers();
-        foreach (var module in modulesAssemblies) {
-            // Web controllers
-            mvcBuilder.AddApplicationPart(module);
-        }
-        mvcBuilder.AddControllersAsServices();
+		var app = builder.Build();
 
-        builder.Services.AddOpenApi();
+		using (var scope = app.Services.CreateScope()) {
+			var modulesList = scope.ServiceProvider.GetServices<LumenModuleBase>();
+			foreach (var module in modulesList) {
+				var dbContext = scope.ServiceProvider.GetService(module.GetDatabaseContextType());
+				if (dbContext is null) {
+					throw new NullReferenceException(nameof(dbContext));
+				}
+				var typedDbContext = (DbContext)dbContext;
+				await typedDbContext.Database.MigrateAsync();
+			}
+		}
 
-        builder.Services.AddHostedService<ModuleExecutionHostedService>();
+		// Configure the HTTP request pipeline.
+		if (app.Environment.IsDevelopment()) {
+			app.MapOpenApi();
+			app.UseSwaggerUI(options => {
+				options.ConfigObject.Urls = [new UrlDescriptor {
+					Name = "LUMEN API",
+					Url = "/openapi/v1.json"
+				}];
+			});
+		}
 
-        var app = builder.Build();
+		app.UseMiddleware<ApiKeyMiddleware>();
+		app.UseHttpsRedirection();
 
-        using (var scope = app.Services.CreateScope()) {
-            var modulesList = scope.ServiceProvider.GetServices<LumenModuleBase>();
-            foreach (var module in modulesList) {
-                var dbContext = scope.ServiceProvider.GetService(module.GetDatabaseContextType());
-                if (dbContext is null) {
-                    throw new NullReferenceException(nameof(dbContext));
-                }
-                var typedDbContext = (DbContext)dbContext;
-                await typedDbContext.Database.MigrateAsync();
-            }
-        }
+		app.UseAuthorization();
 
-        // Configure the HTTP request pipeline.
-        if (app.Environment.IsDevelopment()) {
-            app.MapOpenApi();
-            app.UseSwaggerUI(options => {
-                options.ConfigObject.Urls = [new UrlDescriptor {
-                    Name = "LUMEN API",
-                    Url = "/openapi/v1.json"
-                }];
-            });
-        }
+		app.MapControllers();
 
-        app.UseMiddleware<ApiKeyMiddleware>();
-        app.UseHttpsRedirection();
+		app.Run();
+	}
 
-        app.UseAuthorization();
+	private static IEnumerable<ConfigEntry> GetConfigurationEntries(ConfigurationManager configuration) {
+		var moduleSection = configuration.GetSection("Modules");
+		var entries = new List<ConfigEntry>();
+		foreach (var module in moduleSection.GetChildren()) {
+			foreach (var configEntry in module.GetChildren()) {
+				entries.Add(new ConfigEntry {
+					ConfigKey = configEntry.Key,
+					ConfigValue = configEntry.Value,
+					ModuleName = module.Key,
+				});
+			}
+		}
 
-        app.MapControllers();
+		return entries;
+	}
 
-        app.Run();
-    }
+	private static string GetConnectionString() {
+		var host = Environment.GetEnvironmentVariable("PG_HOST");
+		var username = Environment.GetEnvironmentVariable("PG_USER");
+		var password = Environment.GetEnvironmentVariable("PG_PASSWORD");
+		var database = Environment.GetEnvironmentVariable("PG_DB");
 
-    private static IEnumerable<ConfigEntry> GetConfigurationEntries(ConfigurationManager configuration) {
-        var moduleSection = configuration.GetSection("Modules");
-        var entries = new List<ConfigEntry>();
-        foreach (var module in moduleSection.GetChildren()) {
-            foreach (var configEntry in module.GetChildren()) {
-                entries.Add(new ConfigEntry {
-                    ConfigKey = configEntry.Key,
-                    ConfigValue = configEntry.Value,
-                    ModuleName = module.Key,
-                });
-            }
-        }
-
-        return entries;
-    }
-
-    private static string GetConnectionString() {
-        var host = Environment.GetEnvironmentVariable("PG_HOST");
-        var username = Environment.GetEnvironmentVariable("PG_USER");
-        var password = Environment.GetEnvironmentVariable("PG_PASSWORD");
-        var database = Environment.GetEnvironmentVariable("PG_DB");
-
-        return $"Host={host};Database={database};Username={username};Password={password}";
-    }
+		return $"Host={host};Database={database};Username={username};Password={password}";
+	}
 }
