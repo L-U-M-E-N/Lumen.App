@@ -36,8 +36,7 @@ public class Program {
 		builder.Services.EnableOpenTelemetry(builder.Environment);
 
 		// Add services to the container.
-		//var connectionString = GetConnectionString();
-		var connectionString = builder.Configuration.GetConnectionString("Lumen");
+		var connectionString = builder.Environment.EnvironmentName == "Development" ? builder.Configuration.GetConnectionString("Lumen") : GetConnectionString(); ;
 		var modulesAssemblies = builder.Services.LoadModules(GetConfigurationEntries(builder.Configuration), connectionString);
 
 		var mvcBuilder = builder.Services.AddControllers();
