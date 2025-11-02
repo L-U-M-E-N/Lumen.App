@@ -7,6 +7,6 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="Lumen.Modules.Sdk" Version="0.6.3" />
+		<PackageReference Include="Lumen.Modules.Sdk" Version="0.6.4" />
 	</ItemGroup>
 </Project>
