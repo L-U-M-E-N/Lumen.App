@@ -80,6 +80,7 @@ public class Program {
 
         app.UseMiddleware<ApiKeyMiddleware>();
         app.UseHttpsRedirection();
+        app.UseRouting();
 
         app.UseCors(CORSPolicy);
 

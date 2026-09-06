@@ -11,7 +11,7 @@ namespace Lumen.App.WebAPI.Middlewares {
             _configuration = configuration;
         }
         public async Task InvokeAsync(HttpContext context) {
-            if (context.Request.Path != "/openapi/v1.json" && context.Request.Path != "/swagger/index.html") {
+            if (context.Request.Path != "/openapi/v1.json" && context.Request.Path != "/swagger/index.html" && context.Request.Method != "OPTIONS") {
                 if (string.IsNullOrWhiteSpace(context.Request.Headers[ApiKeyHeaderName])) {
                     context.Response.StatusCode = (int)HttpStatusCode.Unauthorized;
                     return;
