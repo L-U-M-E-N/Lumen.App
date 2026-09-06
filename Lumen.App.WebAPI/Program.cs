@@ -7,12 +7,6 @@ using Lumen.Modules.Sdk;
 
 using Microsoft.EntityFrameworkCore;
 
-using OpenTelemetry;
-using OpenTelemetry.Logs;
-using OpenTelemetry.Metrics;
-using OpenTelemetry.Resources;
-using OpenTelemetry.Trace;
-
 using Swashbuckle.AspNetCore.SwaggerUI;
 
 namespace Lumen.App.WebAPI;
@@ -21,9 +15,17 @@ public class Program {
     protected Program() { }
 
     public static async Task Main(string[] args) {
+        var CORSPolicy = "CORSPolicy";
+
         ModuleLoaderHelper.RunsOn = Lumen.Modules.Sdk.LumenModuleRunsOnFlag.API;
 
         var builder = WebApplication.CreateBuilder(args);
+
+        builder.Services.AddCors(options => {
+            options.AddPolicy(name: CORSPolicy, policy => {
+                policy.AllowAnyMethod().AllowAnyOrigin().AllowAnyHeader();
+            });
+        });
 
         // Config
         builder.Configuration
@@ -38,7 +40,7 @@ public class Program {
 
         // Add services to the container.
         var connectionString = builder.Environment.EnvironmentName == "Development" ? builder.Configuration.GetConnectionString("Lumen") : GetConnectionString(); ;
-        var modulesAssemblies = builder.Services.LoadModules(GetConfigurationEntries(builder.Configuration), connectionString);
+        var modulesAssemblies = builder.Services.LoadModules(GetConfigurationEntries(builder.Configuration), connectionString!);
 
         var mvcBuilder = builder.Services.AddControllers();
         foreach (var module in modulesAssemblies) {
@@ -56,7 +58,7 @@ public class Program {
         using (var scope = app.Services.CreateScope()) {
             var modulesList = scope.ServiceProvider.GetServices<LumenModuleBase>();
             foreach (var module in modulesList) {
-                var dbContext = scope.ServiceProvider.GetService(module.GetDatabaseContextType());
+                var dbContext = scope.ServiceProvider.GetService(module.GetDatabaseContextType()!);
                 if (dbContext is null) {
                     throw new NullReferenceException(nameof(dbContext));
                 }
@@ -79,11 +81,13 @@ public class Program {
         app.UseMiddleware<ApiKeyMiddleware>();
         app.UseHttpsRedirection();
 
+        app.UseCors(CORSPolicy);
+
         app.UseAuthorization();
 
         app.MapControllers();
 
-        app.Run();
+        await app.RunAsync();
     }
 
     private static IEnumerable<ConfigEntry> GetConfigurationEntries(ConfigurationManager configuration) {
